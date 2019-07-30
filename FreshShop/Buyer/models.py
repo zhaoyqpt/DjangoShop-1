@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Manager
 
 class Buyer(models.Model):
     username = models.CharField(max_length=32,verbose_name="用户名")
@@ -47,5 +48,31 @@ class OrderDetail(models.Model):
     goods_store = models.IntegerField(verbose_name = "商店id")
     goods_image = models.ImageField(verbose_name = "商品图片")
 
+class Cart(models.Model):
+    goods_name=models.CharField(max_length=32,verbose_name='商品名称')
+    goods_price=models.FloatField(verbose_name='商品价格')
+    goods_total=models.FloatField(verbose_name='商品小计')
+    goods_number=models.IntegerField(verbose_name='商品数量')
+    goods_picture=models.ImageField(upload_to='buyer/images',verbose_name='商品图片')
+    goods_id=models.IntegerField(verbose_name='商品id')
+    goods_store=models.IntegerField(verbose_name='商品店铺')
+    user_id=models.IntegerField(verbose_name='用户id')
+
+import datetime
+
+class GoodsTypeManage(Manager):
+    def addType(self,name,picture='buyer/images/page_1_10.jpg'):
+        goods_type=GoodsType()
+        goods_type.name=name
+        now=datetime.datetime.now().strftime('%Y-%m-%d')
+        goods_type.description='%s_%s'%(now,name)
+        goods_type.picture=picture
+        goods_type.save()
+        return goods_type
+class GoodsType(models.Model):
+    name=models.CharField(max_length=32,verbose_name='商品类型名称')
+    description=models.TextField(max_length=32,verbose_name='商品类型描述')
+    picture=models.ImageField(upload_to='buyer/images')
+    objects=GoodsTypeManage()
 
 # Create your models here.

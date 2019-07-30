@@ -2,6 +2,7 @@ import time
 
 from django.shortcuts import render
 from django.http import HttpResponse
+from django.http import JsonResponse
 from django.shortcuts import HttpResponseRedirect
 
 from Buyer.models import *
@@ -65,6 +66,7 @@ def index(request):
     result_list = [] #定义一个容器用来存放结果
     goods_type_list = GoodsType.objects.all() #查询所有的类型
     for goods_type in goods_type_list: #循环类型
+        print(goods_type.goods_set)
         goods_list = goods_type.goods_set.values()[:4] #查询前4条
         if goods_list: #如果类型对应的值
             goodsType = {
@@ -122,7 +124,7 @@ def setOrderId(user_id,goods_id,store_id):
     时间+用户id+商品的id+商铺+id
     """
     strtime = time.strftime("%Y%m%d%H%M%S",time.localtime())
-    return strtime+user_id+goods_id+store_id
+    return strtime+str(user_id)+str(goods_id)+str(store_id)
 
 def place_order(request):
     if request.method == "POST":
@@ -145,6 +147,7 @@ def place_order(request):
         order.save()
 
         order_detail = OrderDetail()
+        print(order_detail)
         order_detail.order_id = order
         order_detail.goods_id = goods_id
         order_detail.goods_name = goods.goods_name
@@ -154,12 +157,19 @@ def place_order(request):
         order_detail.goods_store = store_id
         order_detail.goods_image = goods.goods_image
         order_detail.save()
-
+        print(order_detail)
         detail = [order_detail]
+        print(detail)
 
         return render(request,"buyer/place_order.html",locals())
     else:
-        return HttpResponse("非法请求")
+        order_id=request.GET.get('order_id')
+        if order_id:
+            order=Order.objects.get(id=order_id)
+            detail=order.orderdetail_set.all()
+            return render(request,'buyer/place_order.html',locals())
+        else:
+            return HttpResponse("非法请求")
 
 def pay_result(request):
     """
@@ -227,6 +237,68 @@ def pay_order(request):
     order.save()
 
     return HttpResponseRedirect("https://openapi.alipaydev.com/gateway.do?" + order_string)
+
+
+#利用ajax从detail.html获取数据，给数据库添加购物车数据
+def add_cart(request):
+    result={'state':'error','data':''}
+    if request.method=='POST':
+        count=int(request.POST.get('count'))
+        goods_id=request.POST.get('goods_id')
+        goods=Goods.objects.get(id=int(goods_id))
+        user_id=request.COOKIES.get('user_id')
+
+        cart=Cart()
+        cart.goods_name=goods.goods_name
+        cart.goods_price=goods.goods_price
+        cart.goods_total=goods.goods_price*count
+        cart.goods_number=count
+        cart.goods_picture=goods.goods_image
+        cart.goods_id=goods.id
+        cart.goods_store=goods.store_id.id
+        cart.user_id=user_id
+        cart.save()
+        result={'state':'success','data':'商品添加成功'}
+    else:
+        result['data']='请求错误'
+    return JsonResponse(result)
+
+#从数据库取出购物车数据，给cart.html传递数据
+def cart(request):
+    user_id=request.COOKIES.get('user_id')
+    goods_list=Cart.objects.filter(user_id=user_id)
+    num=len(goods_list)
+    if request.method=='POST':
+        post_data=request.POST
+        cart_data=[]
+        for k,v in post_data.items():#name和value
+            if k.startswith('goods_'):
+                cart_data.append(Cart.objects.get(id=int(v)))
+        goods_count=len(cart_data)
+        goods_total=sum([int(i.goods_total) for i in cart_data])
+
+        order=Order()
+        order.order_id=setOrderId(user_id,goods_count,'2')
+        order.goods_count=goods_count
+        order.order_user=Buyer.objects.get(id=user_id)
+        order.order_price=goods_total
+        order.order_status=1
+        order.save()
+
+        for detail in cart_data:
+            order_detail=OrderDetail()
+            order_detail.order_id=order
+            order_detail.goods_id=detail.goods_id
+            order_detail.goods_name=detail.goods_name
+            order_detail.goods_price=detail.goods_price
+            order_detail.goods_number=detail.goods_number
+            order_detail.goods_total=detail.goods_total
+            order_detail.goods_store=detail.goods_store
+            order_detail.goods_image=detail.goods_picture
+            order_detail.save()
+        url='/Buyer/place_order/?order_id=%s'%order.id
+        return HttpResponseRedirect(url)
+    return render(request,'buyer/cart.html',locals())
 
 # Create your views here.
 

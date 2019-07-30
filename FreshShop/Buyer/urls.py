@@ -7,7 +7,9 @@ urlpatterns = [
     path("index/", index),
     path("goods_list/", goods_list),
     path("goods_detail/", goods_detail),
-    path("place_order/", place_order)
+    path("place_order/", place_order),
+    path("cart/", cart),
+    path("add_cart/", add_cart),
 ]
 
 urlpatterns+=[
